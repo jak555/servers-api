@@ -26,7 +26,7 @@ let uploader = {
             formData.append('files', content.files, fileName);
             console.log('file ready')
             let options = {
-                url: 'http://localhost:3000/omegafilesAPI/files/UploadFile/'+ module.exports.loginData.idu + '/'+ folder,
+                url: 'http://192.168.0.18:3000/omegafilesAPI/files/UploadFile/'+ module.exports.loginData.idu + '/'+ folder,
             };
             let test = await axios.post(options.url, formData, );
             let res = test.data;
@@ -48,7 +48,7 @@ let uploader = {
         try{
             let content = {username: module.exports.loginData.username, password: module.exports.loginData.password};
             let options = {
-                url: 'http://localhost:3000/omegafilesAPI/users/loginUser',
+                url: 'http://192.168.0.18:3000/omegafilesAPI/users/loginUser',
             };
             let test = await axios.post(options.url, content);
             let res = test.data;
@@ -75,7 +75,7 @@ let uploader = {
             if(!exists && name.trim()){
                 let content = {folder: name, parent: module.exports.folderData.animeFolder, user: module.exports.loginData.idu};
                 let options = {
-                    url: 'http://localhost:3000/omegafilesAPI/files/addFolder',
+                    url: 'http://192.168.0.18:3000/omegafilesAPI/files/addFolder',
                 };
                 let test = await axios.post(options.url, content);
                 let res = test.data;
@@ -109,7 +109,7 @@ let uploader = {
     getFolders: async () => {
         try{
             let options = {
-                url: 'http://localhost:3000/omegafilesAPI/files/getFolders/' + module.exports.folderData.animeFolder + '/' + module.exports.loginData.idu,
+                url: 'http://192.168.0.18:3000/omegafilesAPI/files/getFolders/' + module.exports.folderData.animeFolder + '/' + module.exports.loginData.idu,
             };
             let test = await axios.get(options.url);
             let res = test.data;

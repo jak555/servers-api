@@ -5,8 +5,8 @@ const objectUploader = require('./objectUploader');
 
 
 let validations = {
-    folders: { downloads: '', toEncode: '', encoded: '' },
-    content: { toEncodeFolders: [], encodedFolders: [], downloadedFolders: [] },
+    folders: { downloads: '', toEncode: '', encoded: '', encodedMixdrop: '' },
+    content: { toEncodeFolders: [], encodedFolders: [], encodedMixdropFolders: [], downloadedFolders: [] },
     init: () => {
         const isLinux = serverInfo.isLinux;
         if(isLinux){
@@ -14,6 +14,8 @@ let validations = {
             module.exports.folders.downloads = '/mnt/pve/DownloadsStorage/download/';
             module.exports.folders.toEncode = '/mnt/pve/DownloadsStorage/ToEncode/';
             module.exports.folders.encoded = '/mnt/pve/DownloadsStorage/Encoded/';
+            //module.exports.folders.encoded = '/mnt/pve/DownloadsStorage/NewEncoded/';
+            module.exports.folders.encodedMixdrop = '/mnt/pve/DownloadsStorage/EncodedMixdrop/';
             objectUploader.login();
             objectUploader.getFolders();
             
@@ -140,9 +142,9 @@ let validations = {
         if(isCompleted){
             if(!fileExists){
                 fs.copyFileSync(file, destiny);
-                console.log(destiny + " has been copied to toEncode folder")
+                console.log(file + " has been copied to toEncode folder")
                 fs.unlinkSync(file);
-                console.log(destiny + " has been deleted")
+                console.log(file + " has been deleted")
             }
         }
     },
@@ -174,6 +176,17 @@ let validations = {
         console.log(ex)
         if(!ex){
             fs.mkdirSync(destino + folderName);
+        }
+        return;
+    },
+    createFolderN: async (destino) => {
+        //let ex = await objectUploader.folderExists(folderName);
+        //console.log(ex);
+        console.log(destino)
+        let ex = await module.exports.exists(destino);
+        console.log(ex)
+        if(!ex){
+            fs.mkdirSync(destino);
         }
         return;
     }
