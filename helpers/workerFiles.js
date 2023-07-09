@@ -20,17 +20,22 @@ let workerFiles = {
             await module.exports.syncFoldersCloud();
             //await module.exports.uploadEncoded();
             await module.exports.processEncode();
-            //await module.exports.uploadEncoded();
+            await module.exports.uploadEncoded();
         }
         return;
     },
     uploadEncoded: async () => {
         let subs = await folderValidations.getSubFolders(folderValidations.folders.encoded);
         for (const folder of subs) {
-            let files = await folderValidations.getFiles(folder);
-            let odFolder = await objectUploader.getFolder(folder.replace(folderValidations.folders.encoded, ""));
+            let nFolder = folder;
+            if(serverInfo.isWindows && (folder.startsWith('/') || folder.startsWith('\\'))){
+                nFolder.replace('/').replace('\\');
+            }
+            let files = await folderValidations.getFiles(nFolder);
+            let odFolder = await objectUploader.getFolder(nFolder.replace(folderValidations.folders.encoded, ""));
+            
             console.log(odFolder)
-            console.log("scanning folder: " + folder);
+            console.log("scanning folder: " + nFolder);
             for (const file of files) {
                 let res = await objectUploader.upload(file, odFolder.uid);
                 console.log(res)
@@ -38,7 +43,7 @@ let workerFiles = {
                     console.log('file uploaded: ' + file);
                     //fs.unlinkSync(file);
                 }
-                console.log("folder: " + folder + " found with id: " + odFolder.uid);
+                console.log("folder: " + nFolder + " found with id: " + odFolder.uid);
                 console.log("file: " + file + " has been uploaded");
                 await mixerUploader.upload(file, null);
             }
@@ -74,22 +79,35 @@ let workerFiles = {
     processEncode: async () => {
         let subs = await folderValidations.getSubFolders(folderValidations.folders.toEncode);
         for (const folder of subs) {
-            let files = await folderValidations.getFiles(folder);
-            console.log("startin Encoder on folder: " + folder);
-            for (const file of files) {
-                let segments = file.split('/');
-                let fn = segments[segments.length -1];
-                let f = segments[segments.length - 2];
-                if(!await folderValidations.exists(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded)) && (file.endsWith('mp4') || file.endsWith('mkv') || file.endsWith('avi') )){
-                    console.log("encoding file: " + file);
-                    //await objectUploader.upload(file, folder.replace(folderValidations.folders.toEncode, ""));
-                    await videoConverter.convertLinuxCPU(file);
-                    //await objectUploader.upload(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded), folder.replace(folderValidations.folders.toEncode, ""));
-                    //await mixerUploader.upload(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded), null);
-                    //fs.unlinkSync(file);
-                    
+            if(folder.indexOf('lost+found') == -1 && folder.indexOf('fonts') == -1){
+                let files = await folderValidations.getFiles(folder);
+                console.log("startin Encoder on folder: " + folder);
+                for (const file of files) {
+                    const isLinux = serverInfo.isLinux;
+                    let segments = file.split('/');
+                    if(!isLinux){
+                        segments = file.split('\\');
+                    }
+                    let fn = segments[segments.length -1];
+                    let f = segments[segments.length - 2];
+                    if(!await folderValidations.exists(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded)) && (file.endsWith('mp4') || file.endsWith('mkv') || file.endsWith('avi') )){
+                        console.log("encoding file: " + file);
+                        //await objectUploader.upload(file, folder.replace(folderValidations.folders.toEncode, ""));
+                        
+                        if(isLinux){
+                            await videoConverter.convertLinuxCPU(file);
+                        }
+                        else{
+                            await videoConverter.convertWindowsGPU(file);
+                        }
+                        
+                        //await objectUploader.upload(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded), folder.replace(folderValidations.folders.toEncode, ""));
+                        //await mixerUploader.upload(file.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded), null);
+                        //fs.unlinkSync(file);
+                        
+                    }
+                    //await objectUploader.upload(file.replace('folderValidations.folders.encoded', ''), folder.replace(folderValidations.folders.encoded, ""));
                 }
-                //await objectUploader.upload(file.replace('folderValidations.folders.encoded', ''), folder.replace(folderValidations.folders.encoded, ""));
             }
         }
     },

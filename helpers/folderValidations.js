@@ -20,9 +20,16 @@ let validations = {
             objectUploader.getFolders();
             
         }
-        //else{
-            //
-        //}
+        else{
+            console.log("Platform detected as linux");
+            module.exports.folders.downloads = path.resolve('Z:\\download\\');
+            module.exports.folders.toEncode = path.resolve('Z:\\ToEncode\\');
+            module.exports.folders.encoded = path.resolve('Z:\\Encoded\\');
+            //module.exports.folders.encoded = '/mnt/pve/DownloadsStorage/NewEncoded/';
+            module.exports.folders.encodedMixdrop = path.resolve('Z:\\EncodedMixdrop\\');
+            objectUploader.login();
+            objectUploader.getFolders();
+        }
     },
     exists: async (route) => {
         return fs.existsSync(route);
@@ -40,13 +47,22 @@ let validations = {
         module.exports.content.downloadedFolders = await module.exports.getSubFolders(module.exports.folders.downloads);
         module.exports.content.toEncodeFolders = await module.exports.getSubFolders(module.exports.folders.toEncode);
         let mFolder = module.exports.folders.toEncode + "Movies/";
+        if(serverInfo.isWindows){
+            mFolder = module.exports.folders.toEncode + "\\Movies\\"
+        }
 
         let rootFiles = await module.exports.getFiles(module.exports.folders.downloads);
 
         let mFolderExists = await module.exports.exists(mFolder);
         
         if(!mFolderExists){
-            await module.exports.createFolder("Movies", module.exports.folders.toEncode);
+            
+            if(serverInfo.isWindows){
+                await module.exports.createFolder("\\Movies\\", module.exports.folders.toEncode);
+            }
+            else{
+                await module.exports.createFolder("Movies", module.exports.folders.toEncode);
+            }
         }
 
         for (const file of rootFiles) {

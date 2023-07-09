@@ -1,5 +1,6 @@
 const execSync = require('child_process').execSync;
 const folderValidations = require('./folderValidations');
+const serverInfo = require('./serverInfo');
 const fs = require('fs');
 //const exec = require('child_process')
 let videoConverter = {
@@ -20,12 +21,12 @@ let videoConverter = {
         //console.log(fonts);
         
 
-        /*
-        if(videoData[0] && videoData[0].codec_name == 'h264'){
+        
+        if(videoData[0] && (videoData[0].codec_name == 'h264' || videoData[0].codec_name == 'libx264')){
             videoCodec = 'copy';
             formats = '';
         }
-        */
+        
        
        console.log('printing')
        console.log(video);
@@ -211,7 +212,127 @@ let videoConverter = {
         
         return;
     },
-    convertWindowsGPU: async () => {},
+    convertWindowsGPU: async (video) => {
+        let nd = await module.exports.getVideoInfo(video);
+
+        let infoVideo = await module.exports.parseResultVI(nd.toString());
+        let audios = await module.exports.getObjectType(infoVideo, "audio");
+        let subtitles = await module.exports.getObjectType(infoVideo, "subtitle");
+        let videoData = await module.exports.getObjectType(infoVideo, "video");
+        let fonts = await module.exports.getObjectType(infoVideo, "attachment");
+        let audioCodec = 'aac';
+        let videoCodec = 'h264_nvenc';
+        //let desiredSizes = ['800M', '500M', '250M', '180M', '80M'];
+        //let desiredSize = await module.exports.getSize(video);
+        let formats = '';
+
+        //console.log(fonts);
+        
+
+        
+        if(videoData[0] && (videoData[0].codec_name == 'h264' || videoData[0].codec_name == 'libx264' || videoData[0].codec_name == 'h264_nvenc')){
+            videoCodec = 'copy';
+            formats = '';
+        }
+        else if(videoData[0] && videoData[0].codec_name == 'hevc'){
+            videoCodec = 'libx264';
+            //formats 
+        }
+        console.log('Video Codec: ' + videoData[0].codec_name);
+        
+       
+       console.log('printing')
+       console.log(video);
+       let destiny = video.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded).replace(".mkv", ".mp4").replace(".avi", ".mp4").replace(".ogm", ".mp4");
+        if(video.indexOf('\\Movies\\') == -1){
+            let segments = video.split('\\');
+            let fileName = segments[segments.length - 1];
+            let folderName = segments[segments.length - 2];
+            destiny = folderValidations.folders.encoded + '\\' + folderName + '\\' +  fileName.replace(".mkv", ".mp4").replace(".avi", ".mp4").replace(".ogm", ".mp4");
+        }
+        
+        
+        let urlParts = destiny.split('\\');
+        let videoName = urlParts[urlParts.length -1];
+        let videoDest = destiny.replace(videoName, '');
+        await folderValidations.createFolderN(videoDest);
+        let command = `ffmpeg -i "${video}" ${formats} -c:v ${videoCodec} -c:a aac -crf 25 "${destiny}" -hide_banner -loglevel error`
+        
+
+        if(audios.length > 1 || subtitles.length > 1){
+            for(let i = 0; i < audios.length; i++){
+                let audio = audios[i];
+                let lang = audio.tags.language;
+                console.log("Audio name:" + lang);
+                if(audio.codec_name == "aac"){
+                    audioCodec = "copy"
+                }
+                else{
+                    audioCodec = "aac"
+                }
+                if(audio && (lang == "jp" || lang == "jap" || lang == "jpn" || lang == "ja" || lang == "japanese" || lang == "japones" || lang == "japonés" || lang == "und" || lang == "undefined" || lang == undefined)){
+                    console.log("enters here")
+                    for(let j = 0; j < subtitles.length; j++){
+                        let subtitle = subtitles[j];
+                        let subLang = subtitle.tags.language;
+                        destiny = video.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded).replace(".mkv", "").replace(".avi", "").replace(".ogm", "");
+                        destiny += `[${lang} - ${subLang}]`;
+                        destiny += ".mp4";
+                        if(!fs.existsSync(destiny)){
+                            if(fonts){
+                                console.log('there are fonts')
+                                await module.exports.extractFonts(fonts, folderValidations.folders.toEncode, video);
+                            }
+                            if(videoCodec != 'copy'){
+                                formats = '-map 0:v:0';
+                            }
+                            command = `ffmpeg -i "${video}" ${formats} -c:v ${videoCodec} -crf 25 -map 0:a:${i} -c:a ${audioCodec} -c:s:0 mov_text -vf "subtitles='${video}':stream_index=${j}[v]" "${destiny}" -hide_banner -loglevel error`;
+                            if(!subtitle.codec_name.includes("hdmv_pgs_subtitle") && !subtitle.codec_name.includes("pgs")){
+                                //command = `ffmpeg -vaapi_device /dev/dri/renderD128 -hwaccel_output_format vaapi -i "${video}" -vf "format=nv12,hwupload" -map 0:v:0 -c:v hevc_vaapi -crf 25 -map 0:a:${i} -c:a ac3 -map 0:s:${j} -c:s:0 copy "${destiny}"`;
+                                await module.exports.encodeVideo(command, video);
+                            }
+                            
+                        }
+                    }
+                }
+                else {
+                    destiny = video.replace(folderValidations.folders.toEncode, folderValidations.folders.encoded).replace(".mkv", "").replace(".avi", "").replace(".ogm", "");
+                    destiny += `[${lang}]`;
+                    destiny += ".mp4";
+                    if(!fs.existsSync(destiny)){
+                        if(fonts){
+                            console.log('there are fonts')
+                            await module.exports.extractFonts(fonts, folderValidations.folders.toEncode, video);
+                        }
+                        if(videoCodec != 'copy'){
+                            formats = '-map 0:v:0';
+                        }
+                        command = `ffmpeg -i "${video}" ${formats} -c:v ${videoCodec} -crf 25 -map 0:a:${i} -c:a ${audioCodec} "${destiny}" -hide_banner -loglevel error`;
+                        await module.exports.encodeVideo(command, video);
+                    }
+                }
+            }
+        }
+        else{
+            console.log(await module.exports.hasSubtitles(video).toString())
+            if(video.includes(".mkv") && await module.exports.hasSubtitles(video) == 0){
+                if(videoCodec != 'copy'){
+                    formats = '-map 0:v:0';
+                }
+                command = `ffmpeg -i "${video}" ${formats} -c:v ${videoCodec} -crf 22 -map 0:a:0 -c:a ${audioCodec} -c:s:0 mov_text -vf "subtitles='${video}':stream_index=0[v]" "${destiny}" -hide_banner -loglevel error`;
+                //console.log(command)
+            }
+            if(!fs.existsSync(destiny)){
+                if(fonts){
+                    console.log('there are fonts')
+                    await module.exports.extractFonts(fonts, folderValidations.folders.toEncode, video);
+                }
+                await module.exports.encodeVideo(command, video);
+            }
+        }
+        
+        return;
+    },
     encodeVideo: async (command, video) => {
         console.log(command);
         execSync(command, (error, stdout, stderr) => {
@@ -246,7 +367,8 @@ let videoConverter = {
         });
     },
     hasSubtitles: async (video) => {
-        let command = `ffmpeg -i "${video}" -c copy -map 0:s:0 -frames:s 1 -f null - -v 0 -hide_banner; echo $?`;
+        //let command = `ffmpeg -i "${video}" -c copy -map 0:s:0 -frames:s 1 -f null - -v 0 -hide_banner; echo $?`;
+        let command = `ffprobe -v error -print_format json -show_entries stream=index,disposition=forced,stream_tags=language,codec_name "${video}"`
         return execSync(command, (error, stdout, stderr) => {
             if (error) {
                 console.error(`error: ${error.message}`);
@@ -257,6 +379,7 @@ let videoConverter = {
                 return 1;
             }
             //console.log(`stdout: ${stdout.toString()}`);
+            console.log(stdout);
             return 0;
         });
     },
@@ -291,6 +414,13 @@ let videoConverter = {
             if(font.tags.mimetype == 'font/ttf' || font.tags.mimetype == 'font/otf'){
                 //console.log(font)
                 let ff = `${folder}fonts/${font.tags.filename}`;
+                if(serverInfo.isWindows){
+                    if(!folder.endsWith('/') && !folder.endsWith('\\')){
+                        ff = `${folder}\\fonts\\${font.tags.filename}`;
+                    }
+                }
+                
+               
                 console.log('Font detected: '+ ff);
                 
                 //console.log('extracting font:' + ff)
@@ -305,7 +435,7 @@ let videoConverter = {
             }
             i++;
         }
-        await module.exports.installFonts();
+        //await module.exports.installFonts();
         }
         /*
         for (let i = 0; i < fonts.length; i++) {
